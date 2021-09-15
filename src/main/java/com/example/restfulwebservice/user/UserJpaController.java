@@ -10,60 +10,67 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import javax.validation.Valid;
 import java.net.URI;
-import java.nio.file.attribute.UserPrincipalNotFoundException;
 import java.util.List;
+import java.util.Optional;
 
-import static org.springframework.hateoas.mvc.ControllerLinkBuilder.linkTo;
-import static org.springframework.hateoas.mvc.ControllerLinkBuilder.methodOn;
-
+import static org.springframework.hateoas.mvc.ControllerLinkBuilder.*;
 
 @RestController
 @RequiredArgsConstructor
-public class UserController {
+@RequestMapping("/jpa")
+public class UserJpaController {
 
     @Autowired
-    private final UserDaoService service;
+    private final UserRepository userRepository;
 
     @GetMapping("/users")
     public List<User> retrieveAllUsers() {
-        return service.findAll();
+        return userRepository.findAll();
     }
 
     @GetMapping("/users/{id}")
     public Resource<User> retrieveUser(@PathVariable int id) {
-        User user = service.findOne(id);
+        Optional<User> user = userRepository.findById(id);
 
-        if (user == null) {
+        if(!user.isPresent()){
             throw new UserNotFoundException(String.format("ID[%s] not found", id));
         }
 
-        // HATEOAS
-        Resource<User> resource = new Resource<>(user);
+        Resource<User> resource = new Resource<>(user.get());
         ControllerLinkBuilder linkTo = linkTo(methodOn(this.getClass()).retrieveAllUsers());
         resource.add(linkTo.withRel("all-users"));
+
 
         return resource;
     }
 
+    @DeleteMapping("/users/{id}")
+    public void deleteUser(@PathVariable int id) {
+        userRepository.deleteById(id);
+    }
+
     @PostMapping("/users")
     public ResponseEntity<User> createUser(@Valid @RequestBody User user) {
-        User savedUser = service.save(user);
+        User savedUser = userRepository.save(user);
 
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{id}")
                 .buildAndExpand(savedUser.getId())
                 .toUri();
-        return ResponseEntity.created(location).build();
 
+        return ResponseEntity.created(location).build();
     }
 
-    @DeleteMapping("/users/{id}")
-    public void deleteUser(@PathVariable int id) {
-        User user = service.deleteById(id);
+    @GetMapping("/users/{id}/posts")
+    public List<Post> retrieveAllPostsByUser(@PathVariable int id) {
 
-        if (user == null) {
+        Optional<User> user = userRepository.findById(id);
+
+        if (!user.isPresent()) {
             throw new UserNotFoundException(String.format("ID[%s] not found", id));
         }
+
+        return user.get().getPosts();
     }
 
 
